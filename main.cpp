@@ -1,56 +1,69 @@
+#include <functional>
 #include <iostream>
 #include <tuple>
+#include <stdexcept>
 
 template<typename Output, typename Target>
 class Pipe {
-    Target target;
+    Target &target;
 public:
     Pipe(Target &target) : target(target) { }
-
     void send(Output output) {
 	target.process(output);
     }
 };
 
-template<class Target>
-class Reader {
+template<typename Output>
+class Component {
 public:
-    typedef std::tuple<int, double, int, double> OutputType;
-    typedef Pipe<OutputType, Target> OutputPipe;
+    typedef Output OutputType;
+    void onOutput(std::function<void(Output)> outputCallback) {
+	this->outputCallback = outputCallback;
+    }
+private:
+    std::function<void(Output)> outputCallback;
+protected:
+    void send(Output output) { outputCallback(output); }
+};
 
-    void start(OutputPipe &pipe) {
-	pipe.send(OutputType(3, 3.5, 5, 5.5));
+class Reader : public Component<std::tuple<int, double, int, double>> {
+public:
+    void start() {
+	send(OutputType(3, 3.3, 5, 5.4));
     }
 };
 
-template<class Target>
-class Transform {
+class Transform : public Component<std::tuple<int, double>> {
 public:
-    typedef std::tuple<int, double> OutputType;
-    typedef Pipe<OutputType, Target> OutputPipe;
-
     void process(std::tuple<int, double, int, double> tuple){
-	auto result = OutputType(std::get<0>(tuple) + std::get<2>(tuple),
-				 std::get<1>(tuple) + std::get<3>(tuple));
-//	pipe.send(result);
+	send(OutputType(std::get<0>(tuple) + std::get<2>(tuple),
+			std::get<1>(tuple) + std::get<3>(tuple)));
     }
 };
 
-template <typename Input>
 class Writer {
+public:
     void process(std::tuple<int, double> tuple) {
+	std::cout << std::get<0>(tuple) << ", " << std::get<1>(tuple) << std::endl;
     }
 };
 
 int main() {
-    Writer<std::tuple<int, double>> writer;
-    Transform<decltype(writer)> transform;
-    Reader<decltype(transform)> reader;
+    Reader reader;
+    Transform transform;
+    Writer writer;
 
-    Pipe<Transform<decltype(writer)>::OutputType, decltype(writer)> pipe1(writer);
-    Pipe<Reader<decltype(transform)>::OutputType, decltype(transform)> pipe2(transform);
+    Pipe<Reader::OutputType, decltype(transform)> pipe1(transform);
+    reader.onOutput([&pipe1](Reader::OutputType output) {
+	    pipe1.send(output);
+	});
 
-    reader.start(pipe2);
+    Pipe<Transform::OutputType, decltype(writer)> pipe2(writer);
+    transform.onOutput([&pipe2](Transform::OutputType output) {
+	    pipe2.send(output);
+	});
+
+    reader.start();
 
     return 0;
 }
