@@ -4,10 +4,10 @@
 #include <stdexcept>
 
 template<typename Output, typename Target>
-class Pipe {
+class Queue {
     Target &target;
 public:
-    Pipe(Target &target) : target(target) { }
+    Queue(Target &target) : target(target) { }
     void send(Output output) {
 	target.process(output);
     }
@@ -53,14 +53,14 @@ int main() {
     Transform transform;
     Writer writer;
 
-    Pipe<Reader::OutputType, decltype(transform)> pipe1(transform);
-    reader.onOutput([&pipe1](Reader::OutputType output) {
-	    pipe1.send(output);
+    Queue<Reader::OutputType, decltype(transform)> queue1(transform);
+    reader.onOutput([&queue1](Reader::OutputType output) {
+	    queue1.send(output);
 	});
 
-    Pipe<Transform::OutputType, decltype(writer)> pipe2(writer);
-    transform.onOutput([&pipe2](Transform::OutputType output) {
-	    pipe2.send(output);
+    Queue<Transform::OutputType, decltype(writer)> queue2(writer);
+    transform.onOutput([&queue2](Transform::OutputType output) {
+	    queue2.send(output);
 	});
 
     reader.start();
