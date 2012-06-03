@@ -48,21 +48,25 @@ public:
     }
 };
 
+class Pipeline {
+public:
+    template<typename Left, typename Right>
+    void connect(Left &left, Right &right) {
+	Queue<typename Left::OutputType, decltype(right)> queue(right);
+	left.onOutput([&queue, &right](typename Left::OutputType output) {
+		queue.send(output);
+	    });
+    }
+};
+
 int main() {
     Reader reader;
     Transform transform;
     Writer writer;
 
-    Queue<Reader::OutputType, decltype(transform)> queue1(transform);
-    reader.onOutput([&queue1](Reader::OutputType output) {
-	    queue1.send(output);
-	});
-
-    Queue<Transform::OutputType, decltype(writer)> queue2(writer);
-    transform.onOutput([&queue2](Transform::OutputType output) {
-	    queue2.send(output);
-	});
-
+    Pipeline pipeline;
+    pipeline.connect(reader, transform);
+    pipeline.connect(transform, writer);
     reader.start();
 
     return 0;
